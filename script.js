@@ -59,6 +59,15 @@ const audio = $("#festival-audio");
 const flash = $("#flash");
 const viewer = $("#viewer");
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const motion = () => window.gsap;
+
+function runEnterFallback() {
+  world.style.visibility = "visible";
+  world.style.opacity = "1";
+  world.setAttribute("aria-hidden", "false");
+  hero.style.visibility = "hidden";
+  initThreeWorld();
+}
 const mobile =
   matchMedia("(max-width: 700px)").matches ||
   matchMedia("(pointer: coarse)").matches;
@@ -191,7 +200,9 @@ function moonMagic(event) {
   const rect = event.currentTarget.getBoundingClientRect();
   particleBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, 85);
   firework(rect.left + rect.width / 2, rect.top + rect.height / 2);
-  window.gsap.fromTo(
+  const gsap = motion();
+  if (!gsap) return;
+  gsap.fromTo(
     event.currentTarget,
     { filter: "brightness(1)" },
     {
@@ -206,7 +217,7 @@ function moonMagic(event) {
   document
     .querySelectorAll(".cloud")
     .forEach((c, i) =>
-      window.gsap.to(c, {
+      gsap.to(c, {
         x: i % 2 ? 180 : -180,
         opacity: 0.08,
         duration: 1.8,
@@ -224,7 +235,16 @@ function enterFestival() {
     moonRect.top + moonRect.height / 2,
     130,
   );
-  window.gsap
+  const gsap = motion();
+  if (!gsap) {
+    runEnterFallback();
+    audio
+      .play()
+      .then(updateAudioState)
+      .catch(() => updateAudioState());
+    return;
+  }
+  gsap
     .timeline({ defaults: { ease: "power3.inOut" } })
     .to(".hero-content", {
       opacity: 0,
@@ -582,8 +602,10 @@ function onWorldClick(event) {
 function worldMoonMagic(event) {
   particleBurst(event.clientX, event.clientY, 100);
   firework(event.clientX, event.clientY);
-  window.gsap.fromTo(flash, { opacity: 0.24 }, { opacity: 0, duration: 1.1 });
-  window.gsap.fromTo(
+  const gsap = motion();
+  if (!gsap) return;
+  gsap.fromTo(flash, { opacity: 0.24 }, { opacity: 0, duration: 1.1 });
+  gsap.fromTo(
     worldMoon.scale,
     { x: 1, y: 1, z: 1 },
     {
@@ -598,7 +620,7 @@ function worldMoonMagic(event) {
   );
   cards.forEach((c, i) => {
     if (c)
-      window.gsap.to(c.position, {
+      window.gsap?.to(c.position, {
         y: c.position.y + (i % 2 ? 0.55 : -0.4),
         duration: 0.45,
         yoyo: true,
@@ -655,15 +677,25 @@ function openViewer(index) {
   viewerIndex = index;
   renderViewer();
   viewer.hidden = false;
-  window.gsap.fromTo(viewer, { opacity: 0 }, { opacity: 1, duration: 0.35 });
-  window.gsap.fromTo(
+  const gsap = motion();
+  if (!gsap) {
+    viewer.style.opacity = "1";
+    return;
+  }
+  gsap.fromTo(viewer, { opacity: 0 }, { opacity: 1, duration: 0.35 });
+  gsap.fromTo(
     "#viewer figure",
     { scale: 0.88, y: 20, opacity: 0 },
     { scale: 1, y: 0, opacity: 1, duration: 0.55, ease: "power3.out" },
   );
 }
 function closeViewer() {
-  window.gsap.to(viewer, {
+  const gsap = motion();
+  if (!gsap) {
+    viewer.hidden = true;
+    return;
+  }
+  gsap.to(viewer, {
     opacity: 0,
     duration: 0.25,
     onComplete: () => {
@@ -681,13 +713,18 @@ function renderViewer() {
 function stepViewer(dir) {
   viewerIndex =
     (viewerIndex + dir + FESTIVAL.photos.length) % FESTIVAL.photos.length;
-  window.gsap.to("#viewer figure", {
+  const gsap = motion();
+  if (!gsap) {
+    renderViewer();
+    return;
+  }
+  gsap.to("#viewer figure", {
     opacity: 0,
     scale: 0.96,
     duration: 0.18,
     onComplete: () => {
       renderViewer();
-      window.gsap.to("#viewer figure", {
+      gsap.to("#viewer figure", {
         opacity: 1,
         scale: 1,
         duration: 0.28,
@@ -713,13 +750,7 @@ addEventListener("pointermove", (e) => {
   pointer.targetY = -((e.clientY / innerHeight) * 2 - 1);
   if (!entered) {
     document.documentElement.style.setProperty("--px", pointer.targetX);
-    window.gsap.to(".hero-content", {
-      x: pointer.targetX * 8,
-      y: pointer.targetY * 5,
-      duration: 1.2,
-      overwrite: true,
-    });
-    window.gsap.to(".hero-moon", {
+    window.gsap?.to(".hero-moon", {
       marginLeft: pointer.targetX * 13,
       marginTop: -pointer.targetY * 8,
       duration: 1.5,
@@ -744,21 +775,14 @@ createSky();
 buildHeroLanterns();
 requestAnimationFrame(drawSky);
 window.gsap
-  .timeline()
-  .to(".hero-content", {
-    opacity: 1,
-    duration: 1.6,
-    ease: "power2.out",
-    delay: 0.25,
-  })
-  .from(".eyebrow", { y: 12, opacity: 0, duration: 0.8 }, "-=1.2")
+  ?.timeline()
+  .from(".eyebrow", { y: 12, opacity: 0, duration: 0.8 }, 0.2)
   .from(
     "h1",
     { y: 28, opacity: 0, filter: "blur(8px)", duration: 1.1 },
-    "-=.85",
+    "-=.55",
   )
-  .from(".subtitle", { y: 12, opacity: 0, duration: 0.8 }, "-=.6")
-  .from(".portal-button", { y: 14, opacity: 0, duration: 0.65 }, "-=.4");
+  .from(".subtitle", { y: 12, opacity: 0, duration: 0.8 }, "-=.6");
 setInterval(
   () => {
     if (!document.hidden && Math.random() > 0.35) firework();
